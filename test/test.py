@@ -52,7 +52,7 @@ start = time.time()
 for i in range(1000):
     output, _= model(input)
 
-print("Time spend ", time.time() - start, " for 1000 times.")
+print("Time spend ", time.time() - start, " s for 1000 times.")
 result = from_tensor(output)
 
 result.show()
