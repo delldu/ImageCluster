@@ -74,7 +74,7 @@ class Cluster(nn.Module):
             pixels = img.load()
             for i in range(h):
                 for j in range(w):
-                    (r, g, b) = pixels[i, j]
+                    (r, g, b) = pixels[j, i]
                     count[RGB565.NO(r, g, b)] += 1
         hist = torch.FloatTensor(count)
         sum = hist.sum()

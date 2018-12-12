@@ -13,7 +13,7 @@ clean:
 	rm -rf *egg-info install.log
 
 example:
-	cd test && python test.py && cd ..
+	cd test && python test.py girl.jpg && cd ..
 
 uninstall:
 	cat install.log | xargs rm -rf

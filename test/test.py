@@ -12,6 +12,7 @@ from torchvision import transforms
 import imagecluster as ic
 
 import time
+import sys
 
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -39,20 +40,21 @@ def from_tensor(tensor):
     return transform(tensor.squeeze(0).cpu())
 
 
-img = image_open("girl.jpg")
-input = to_tensor(img)
+if __name__ == "__main__":
+    img = image_open(sys.argv[1])
+    input = to_tensor(img)
 
-model = ic.Cluster(["girl.jpg"], 128, 256)
-model = model.to(device)
+    model = ic.Cluster([sys.argv[1]], 128, 256)
+    model = model.to(device)
 
-input = input.to(device)
-start = time.time()
+    input = input.to(device)
+    start = time.time()
 
 
-for i in range(1000):
-    output, _= model(input)
+    for i in range(1000):
+        output, _= model(input)
 
-print("Time spend ", time.time() - start, " s for 1000 times.")
-result = from_tensor(output)
+    print("Time spend ", time.time() - start, " s for 1000 times.")
+    result = from_tensor(output)
 
-result.show()
+    result.show()
