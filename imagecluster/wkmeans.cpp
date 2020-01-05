@@ -194,34 +194,34 @@ at::Tensor wkmeans_class(const at::Tensor &input, const at::Tensor &center)
     return cindex;
 }
 
-/************************************************************************************
-*
-* output = wkmeans_render(input, center)
-*
-************************************************************************************/
-at::Tensor wkmeans_render(const at::Tensor &input, const at::Tensor &center)
-{
-    const int N = input.size(0);
-    const int n_feats = center.size(1) - 1;
+// /************************************************************************************
+// *
+// * output = wkmeans_render(input, center)
+// *
+// ************************************************************************************/
+// at::Tensor wkmeans_render(const at::Tensor &input, const at::Tensor &center)
+// {
+//     const int N = input.size(0);
+//     const int n_feats = center.size(1) - 1;
 
-    auto output = at::zeros({N, n_feats}, at::kFloat);
-    output.contiguous();
+//     auto output = at::zeros({N, n_feats}, at::kFloat);
+//     output.contiguous();
 
-    // cluster index for class
-    auto cindex = wkmeans_class(input, center);
-    cindex.contiguous();
+//     // cluster index for class
+//     auto cindex = wkmeans_class(input, center);
+//     cindex.contiguous();
 
-    auto output_a = output.accessor<float, 2>();
-    auto cindex_a = cindex.accessor<int32_t, 1>();
-    auto center_a = center.accessor<float, 2>();
+//     auto output_a = output.accessor<float, 2>();
+//     auto cindex_a = cindex.accessor<int32_t, 1>();
+//     auto center_a = center.accessor<float, 2>();
 
-    for (int i = 0; i < N; i++) {
-        int index = cindex_a[i];
+//     for (int i = 0; i < N; i++) {
+//         int index = cindex_a[i];
 
-        for (int j = 0; j < n_feats; j++) {
-            output_a[i][j] = center_a[index][j];
-        }
-    }
+//         for (int j = 0; j < n_feats; j++) {
+//             output_a[i][j] = center_a[index][j];
+//         }
+//     }
 
-    return output;
-}
+//     return output;
+// }

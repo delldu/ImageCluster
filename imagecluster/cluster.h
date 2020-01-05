@@ -9,7 +9,7 @@
 
 void wkmeans_cluster(const at::Tensor &sample, int K, int maxloops, at::Tensor &center);
 at::Tensor wkmeans_class(const at::Tensor &input, const at::Tensor &center);
-at::Tensor wkmeans_render(const at::Tensor &input, const at::Tensor &center);
+// at::Tensor wkmeans_render(const at::Tensor &input, const at::Tensor &center);
 
 void image_cluster(const at::Tensor &hist, int K, int maxloops, at::Tensor &index, at::Tensor &center);
 void image_cluster_forward(const at::Tensor& input, const at::Tensor& index, const at::Tensor& center, at::Tensor& output, at::Tensor& label);

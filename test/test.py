@@ -13,7 +13,7 @@ import imagecluster as ic
 
 import time
 import sys
-
+import pdb
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 #device = torch.device("cpu")
@@ -49,12 +49,17 @@ if __name__ == "__main__":
 
     input = input.to(device)
     start = time.time()
+    output, label = model(input)
+    print("Cluster spend ", time.time() - start, " s.")
+
+    start = time.time()
+    segment_result = model.segment(label, 2)
+    print("Segment spend ", time.time() - start, " s.")
+
+    maskimg = ic.Blend(img, segment_result, 0.1)
+    maskimg.show()
 
 
-    for i in range(1000):
-        output, _= model(input)
-
-    print("Time spend ", time.time() - start, " s for 1000 times.")
     result = from_tensor(output)
 
     result.show()
