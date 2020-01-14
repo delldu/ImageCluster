@@ -30,12 +30,12 @@ struct {
     int row[MAX_STACK_ELEMENTS], col[MAX_STACK_ELEMENTS], count;
 } temp_stack;
 
-void statck_reset()
+inline void statck_reset()
 {
     temp_stack.count = 0;
 }
 
-void stack_push(int row, int col)
+inline void stack_push(int row, int col)
 {
     if (temp_stack.count < MAX_STACK_ELEMENTS) {
         temp_stack.row[temp_stack.count] = row;
@@ -44,17 +44,60 @@ void stack_push(int row, int col)
     }
 }
 
-void stack_pop(int *row, int *col)
+inline void stack_pop(int *row, int *col)
 {
     *row = temp_stack.row[temp_stack.count - 1];
     *col = temp_stack.col[temp_stack.count - 1];
     temp_stack.count--;
 }
 
-
-int stack_empty()
+inline int stack_empty()
 {
     return temp_stack.count < 1;
+}
+
+inline void check_4dims(const at::Tensor& tensor)
+{
+    if (tensor.dim() != 4) {
+        std::cout << "Error: Tensor is not 4 dims(BxCxHxW)." << std::endl;
+        exit(-1);
+    }
+}
+
+inline void check_input(const at::Tensor& input)
+{
+    check_4dims(input);
+    if (input.size(1) != 3) {
+        std::cout << "Error: Input is not Bx3xHxW tensor." << std::endl;
+        exit(-1);
+    }
+}
+
+inline void check_label(const at::Tensor& label)
+{
+    check_4dims(label);
+    if (label.size(1) != 1) {
+        std::cout << "Error: label is not Bx1xHxW tensor." << std::endl;
+        exit(-1);
+    }
+}
+
+inline void check_mask(const at::Tensor& mask)
+{
+    check_4dims(mask);
+    if (mask.size(1) != 1) {
+        std::cout << "Error: mask is not Bx1xHxW tensor." << std::endl;
+        exit(-1);
+    }
+}
+
+inline void check_output(const at::Tensor& output)
+{
+    check_4dims(output);
+    if (output.size(1) != 3) {
+        std::cout << "Error: output is not Bx3xHxW tensor." << std::endl;
+        exit(-1);
+    }
 }
 
 
@@ -105,15 +148,13 @@ void image_cluster_forward(const at::Tensor& input, const at::Tensor &index, con
     int c;
     float r, g, b;
 
+    check_input(input);
+    check_label(label);
+
     const int B = input.size(0);
-    const int C = input.size(1);
+    // const int C = input.size(1);
     const int H = input.size(2);
     const int W = input.size(3);
-
-    if (C != 3) {
-        std::cout << "Error: Input is not RGB image tensor." << std::endl;
-        exit(-1);
-    }
 
     input.contiguous();
     output.contiguous();
@@ -155,82 +196,142 @@ int image_cluster_backward(at::Tensor grad_output, at::Tensor input, at::Tensor 
     return 1;
 }
 
+#define start_segment_tracking() \
+do { \
+    statck_reset(); \
+    stack_push(i, j); \
+    while(! stack_empty()) { \
+        stack_pop(&row, &col); \
+        label_a[batch][0][row][col] = -1; \
+        mask_a[batch][0][row][col] = instance; \
+        start_row = MAX(0, row - radius); \
+        stop_row = MIN(H - 1, row + radius); \
+        start_col = MAX(0, col - radius); \
+        stop_col = MIN(W - 1, col + radius); \
+        for (i2 = start_row; i2 <= stop_row; i2++) { \
+            for (j2 = start_col; j2 <= stop_col; j2++) { \
+                if (label_a[batch][0][i2][j2] == c) \
+                    stack_push(i2, j2); \
+            } \
+        } \
+    } \
+} while (0)
 
-void image_cluster_segment(const at::Tensor& label, int radius, at::Tensor& output_mask)
+void image_label_segment(const at::Tensor& label, int radius, at::Tensor& mask)
 {
-    int i, j, i2, j2, c, row, col, instance;
+    // radius -- define neighbours
+    int i, j, i2, j2, c, row, col, start_row, start_col, stop_row, stop_col, instance;
+
+    check_label(label);
+    check_mask(mask);
 
     const int B = label.size(0);
-    const int C = label.size(1);
+    // const int C = label.size(1);
     const int H = label.size(2);
     const int W = label.size(3);
 
-    if (C != 1) {
-        std::cout << "Error: label is not Bx1xHxW tensor." << std::endl;
-        exit(-1);
-    }
-
     label.contiguous();
-    output_mask.contiguous();
+    mask.contiguous();
 
     auto label_a = label.accessor<int32_t, 4>();
-    auto output_mask_a = output_mask.accessor<int32_t, 4>();
+    auto mask_a = mask.accessor<int32_t, 4>();
 
-    for (int bat = 0; bat < B; bat++) {
+    for (int batch = 0; batch < B; batch++) {
         instance = 0;
         for (i = 0; i < H; i++) {
             for (j = 0; j < W; j++) {
-                c =  label_a[bat][0][i][j];
+                c = label_a[batch][0][i][j];
                 if (c < 0)
                     continue;
-
-                // New tracking from here (row == i, col == j, label == c)
+               // New tracking
+                start_segment_tracking();
                 instance++;
-                statck_reset();
-
-                stack_push(i, j);
-                while(! stack_empty()) {
-                    stack_pop(&row, &col);
-                    // Save row, col to output_mask
-                    output_mask_a[bat][0][row][col] = instance;
-                    label_a[bat][0][row][col] = -1;
-                    // Search neighbours around(row, col) ...
-                    for (i2 = MAX(0, row - radius); i2 < MIN(H, row + radius); i2++) {
-                        for (j2 = MAX(0, col - radius); j2 < MIN(W, col + radius); j2++) {
-                            if (label_a[bat][0][i2][j2] == c)
-                                stack_push(i2, j2);
-                        }
-                    }
-                }
-                // Finish tracking ! 
             }
         }
     }
 }
 
-void image_cluster_adjmatrix(const at::Tensor& input_mask, at::Tensor& output_matrix)
+void image_color_mask(const at::Tensor& mask, const at::Tensor& colors, at::Tensor& output)
 {
+    check_mask(mask);
+    check_output(output);
+
+    const int B = mask.size(0);
+    // const int C = mask.size(1);
+    const int H = mask.size(2);
+    const int W = mask.size(3);
+    const int NC = colors.size(0);  // Number of colors
+
+    mask.contiguous();
+    colors.contiguous();
+    output.contiguous();
+
+    auto mask_a = mask.accessor<int32_t, 4>();
+    auto colors_a = colors.accessor<float, 2>();
+    auto output_a = output.accessor<float, 4>();
+
+    for (int batch = 0; batch < B; batch++) {
+        for (int i = 0; i < H; i++) {
+            for (int j = 0; j < W; j++) {
+                int c = mask_a[batch][0][i][j] % NC;
+                output_a[batch][0][i][j] = colors_a[c][0];
+                output_a[batch][1][i][j] = colors_a[c][1];
+                output_a[batch][2][i][j] = colors_a[c][2];
+            }
+        }
+    }
+}
+
+#define update_adjmatrix() \
+do { \
+    int c1 = input_mask_a[batch][0][i][j]; \
+    for (int i2 = start_row; i2 <= stop_row; i2++) { \
+        for (int j2 = start_col; j2 <= stop_col; j2++) { \
+            int c2 = input_mask_a[batch][0][i2][j2]; \
+            if ((i == i2 && j == j2) || (c1 == c2)) \
+                continue; \
+            output_matrix_a[c1][c2] = output_matrix_a[c2][c1] = 1; \
+        } \
+    } \
+} while (0)
+
+
+void image_mask_adjmatrix(const at::Tensor& input_mask, int radius, at::Tensor& output_matrix)
+{
+    check_mask(input_mask);
+
     const int B = input_mask.size(0);
-    const int C = input_mask.size(1);
+    // const int C = input_mask.size(1);
     const int H = input_mask.size(2);
     const int W = input_mask.size(3);
-
-    if (C != 1) {
-        std::cout << "Error: input mask is not Bx1xHxW tensor." << std::endl;
-        exit(-1);
-    }
-
 
     input_mask.contiguous();
     output_matrix.contiguous();
 
+    auto input_mask_a = input_mask.accessor<int32_t, 4>(); // Bx1xHxW
+    auto output_matrix_a = output_matrix.accessor<int32_t, 2>();    // NxN matrix
+
+    for (int batch = 0; batch < B; batch++) {
+        for (int i = 0; i < H; i++) {
+            int start_row = MAX(0, i - radius);
+            int stop_row = MIN(H - 1, i + radius);
+            for (int j = 0; j < W; j++) {
+                int start_col = MAX(0, j - radius);
+                int stop_col = MIN(W - 1, j + radius);
+
+                // check neighbours: [i --> stop_row, j --> stop_col] 
+                update_adjmatrix();
+            }
+        }
+    }
 }
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     m.def("cluster", &image_cluster, "Image cluster");
     m.def("forward", &image_cluster_forward, "Image cluster forward");
     m.def("backward", &image_cluster_backward, "Image cluster backward");
-    m.def("segment", &image_cluster_segment, "Image segment");
-    m.def("adjmatrix", &image_cluster_adjmatrix, "Image adjmatrix");
+    m.def("segment", &image_label_segment, "Image label segment");
+    m.def("colormask", &image_color_mask, "Color segment mask");
+    m.def("adjmatrix", &image_mask_adjmatrix, "Image adjmatrix");
 }
 

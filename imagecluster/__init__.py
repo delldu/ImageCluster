@@ -8,8 +8,8 @@
 
 __version__ = "1.0.0"
 
-from .cluster import Cluster, Blend
+from .cluster import Cluster, Segment, ColorMask, AdjMatrix
 
 __all__ = [
-    "Cluster", "Blend"
+    "Cluster", "Segment", "ColorMask", "AdjMatrix"
 ]
